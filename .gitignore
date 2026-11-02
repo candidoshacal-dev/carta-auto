@@ -1,5 +1,20 @@
-﻿# Ficheiros locais que nao devem ir para o repositorio
+# Ficheiros locais e artefactos de testes que nao devem ir para o repositorio
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+data/
+*.log
+.test-tmp/
 .pip-cache/
-.env.prod
-testes_codigo_completo_com_imagens.pdf
+.test-data/
 carta_auto_testes.db
+carta_auto_testes.db.backup*
+login.json
+test_logo.png
+scratch_probe_pdf*.py
+Carta_Auto_Testes_para_outra_IA.zip
+*.pdf
