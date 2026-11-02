@@ -1,0 +1,15 @@
+Carta Auto Testes — pacote para continuar noutra IA
+
+COMEÇAR POR AQUI
+1. Leia AI_HANDOFF.md para conhecer o estado do projeto e o trabalho pendente.
+2. Use Carta_Auto_Testes_para_outra_IA.zip como pacote principal de transferência. O ZIP inclui o código, as perguntas/imagens, documentação e uma base de dados seed sem contas de utilizador.
+3. Para continuar diretamente nesta pasta, consulte README.md e TODO_MANUTENCAO_IA.md.
+
+ESTADO
+- Projeto local preparado; não está publicado na Internet.
+- Os testes automatizados passaram: 7 aprovados; há 1 aviso de compatibilidade não bloqueante.
+- A revisão visual em Chrome/Firefox ainda está pendente.
+- O login administrativo exige configuração/verificação MFA; não enviar credenciais ou bases de dados locais.
+
+ENVIAR À OUTRA IA
+Envie apenas Carta_Auto_Testes_para_outra_IA.zip e, se necessário, este ficheiro de orientação. Não inclua .env, bases de dados locais, backups, pastas .venv ou tokens.

@@ -1,0 +1,40 @@
+# CARTA AUTO TESTES — HANDOFF PARA BOT/OUTRA IA (DEPLOY PÚBLICO)
+
+## O QUE JÁ ESTÁ FEITO
+1. Código funcional: server.py (FastAPI), database.py (SQLite + migrações), static/ (interface completa, design corrigido, logo transparente, temas claro/escuro, responsivo desktop/tablet/móvel).
+2. Base seed limpa: seed/carta_auto_testes_seed.db — 2.594 perguntas (A 298, B 1.962, C 157, D 177), sem contas de utilizador.
+3. Ficheiros de produção prontos na raiz do projeto:
+   - deploy.sh — script automatizado de deploy (rede Docker, .env, Caddyfile, build, validação)
+   - docker-compose.prod.yml — app + Caddy, restart unless-stopped, healthcheck, rede isolada carta-auto-net
+   - .env.prod — template de produção com placeholders
+   - Caddyfile — HTTPS automático Let's Encrypt, reverse_proxy app:8000
+   - DEPLOY_CHECKLIST.md — checklist completo passo a passo
+4. Testes de API: 7 aprovados em base temporária.
+5. Login local confirmado: admin e estudante funcionam (CAT_ENV=development).
+
+## O QUE FALTA FAZER PARA FICAR PÚBLICO (lista para o bot)
+1. VPS/Cloud contratado com Docker + Docker Compose instalados.
+2. Domínio registado e apontado (registo A) para o IP do VPS.
+3. Firewall do VPS: abrir apenas 80, 443.
+4. Copiar para o VPS: código sem .env, sem *.db, sem login.json, sem backups, sem .venv — mais deploy.sh, docker-compose.prod.yml, .env.prod, Caddyfile.
+5. No VPS:
+   - docker network create carta-auto-net
+   - cp .env.prod .env
+   - Preencher em .env: SESSION_SECRET (openssl rand -base64 48), CAT_ADMIN_PASSWORD (≥14 chars único), SMTP_HOST/USER/PASSWORD/FROM, CORS_ORIGINS=https://DOMINIO
+   - Substituir YOUR_DOMAIN no Caddyfile e SMTP_FROM
+   - bash deploy.sh DOMINIO (ou docker compose -f docker-compose.prod.yml up -d --build)
+6. Primeiro acesso ADMIN: executar python reset_admin_mfa.py no VPS para configurar MFA/TOTP (obrigatório).
+7. Validar: curl -sI https://DOMINIO; login admin e estudante; temas; teste completo com imagens; docker compose logs.
+8. Backups automáticos do volume carta_auto_testes_data.
+
+## REGRAS CRÍTICAS
+- NUNCA copiar .env, .env.test, login.json, carta_auto_testes.db, backups para o servidor público ou ZIP.
+- MFA TOTP obrigatório para ADMIN, também em produção.
+- Não usar password de demonstração em produção.
+- Regras de exame implementadas: B 30/30min/27 certas; A sem B 40/40min/36; A com B 10/10min/9; C e D 20/25min/18.
+
+## COMANDO DE DEPLOY RESUMIDO
+docker network create carta-auto-net
+cp .env.prod .env && nano .env
+nano Caddyfile  # trocar YOUR_DOMAIN
+bash deploy.sh SEU_DOMINIO
