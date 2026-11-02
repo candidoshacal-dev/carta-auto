@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: carta-auto-testes
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CAT_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true

@@ -1,0 +1,8 @@
+fastapi>=0.110,<1
+uvicorn>=0.27,<1
+pydantic>=2.6,<3
+pyotp>=2.9.0,<3
+cryptography>=42.0.0,<51
+
+python-multipart>=0.0.9,<1
+
