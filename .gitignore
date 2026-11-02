@@ -1,20 +1,5 @@
-.env
-.env.*
-!.env.example
-.venv/
-__pycache__/
-.pytest_cache/
-*.py[cod]
-data/
-*.log
-.test-tmp/
+﻿# Ficheiros locais que nao devem ir para o repositorio
 .pip-cache/
-.test-data/
-/carta_auto_testes.db
-/carta_auto_testes.db.backup*
-login.json
-test_logo.png
-scratch_probe_pdf*.py
-Carta_Auto_Testes_para_outra_IA.zip
-
+.env.prod
 testes_codigo_completo_com_imagens.pdf
+carta_auto_testes.db
