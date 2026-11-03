@@ -10,4 +10,10 @@ services:
       - key: CAT_ENV
         value: production
       - key: SESSION_SECRET
+        value: DwqahOG7UxvsjrF6IpHFwOSfAj29ovpT8QaU5lgiA5hcq6mc4OAKO8DiXf7QgvHkVsbL8DEmOKVoW_sOafEuJg
+      - key: CAT_ADMIN_EMAIL
+        value: candidoshacal@gmail.com
+      - key: CAT_ADMIN_PASSWORD
+        value: 1234
+      - key: CAT_MFA_ENCRYPTION_KEY
         generateValue: true
