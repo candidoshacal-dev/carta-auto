@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from database import get_connection, init_db, hash_password, verify_password
+from database import get_connection, init_db, hash_password, verify_password, USE_POSTGRES
 
 APP_ENV = os.environ.get('CAT_ENV', 'development').lower()
 SESSION_SECRET = os.environ.get('SESSION_SECRET', 'local-development-only-change-before-deploy')
@@ -337,6 +337,7 @@ def register(req: RegisterRequest):
     c.execute("""
     INSERT INTO users (role, nome_completo, numero_aluno, email, telemovel, password_hash, created_at, license_expires_at, allowed_categories, is_active)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    RETURNING id
     """, (
         'ALUNO',
         req.nome_completo.strip(),
@@ -348,7 +349,7 @@ def register(req: RegisterRequest):
         expires_at,
         'B' # Default category B
     ))
-    user_id = c.lastrowid
+    user_id = c.fetchone()[0] if USE_POSTGRES else c.lastrowid
     conn.commit()
 
     c.execute("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -1100,6 +1101,7 @@ def start_test(req: StartTestRequest, user: dict = Depends(get_current_user)):
     c.execute("""
     INSERT INTO tests (user_id, categoria, test_type, tema, total_questions, max_errors_allowed, correct_count, error_count, passed, duration_seconds, created_at, question_ids)
     VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?)
+    RETURNING id
     """, (
         user['id'],
         cat,
@@ -1110,7 +1112,7 @@ def start_test(req: StartTestRequest, user: dict = Depends(get_current_user)):
         now_str,
         json.dumps(selected_ids)
     ))
-    test_id = c.lastrowid
+    test_id = c.fetchone()[0] if USE_POSTGRES else c.lastrowid
     conn.commit()
     conn.close()
 
@@ -1727,8 +1729,9 @@ def admin_create_question(req: AdminQuestionRequest, admin: dict = Depends(get_a
     c.execute("""
         INSERT INTO questions (categoria, tema, prompt, options, correct_letter, image_path)
         VALUES (?, ?, ?, ?, ?, ?)
+        RETURNING id
     """, (cat, req.tema.strip(), req.prompt.strip(), json.dumps(options, ensure_ascii=False), letter, req.image_path))
-    qid = c.lastrowid
+    qid = c.fetchone()[0] if USE_POSTGRES else c.lastrowid
     conn.commit()
     conn.close()
     return {"id": qid, "message": "Pergunta adicionada."}
