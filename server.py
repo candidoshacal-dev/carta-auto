@@ -248,7 +248,7 @@ def record_failed_attempt(user_id: int, ip_address: Optional[str] = None):
 def record_successful_login(user_id: int, ip_address: Optional[str] = None):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?", (user_id,))
+    c.execute("UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = ? WHERE id = ?", (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id))
     conn.commit()
     conn.close()
 
@@ -288,7 +288,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
     return dict(user)
 
 def get_admin_user(current_user: dict = Depends(get_current_user)):
-    if current_user['role'] != 'ADMIN':
+    if current_user['role'] != 'ADMIN' or str(current_user.get('email', '')).lower() != 'candidoshacal@gmail.com':
         raise HTTPException(status_code=403, detail="Acesso reservado ao Administrador.")
     return current_user
 
@@ -1532,8 +1532,8 @@ def admin_get_students(
     c = conn.cursor()
 
     query = """
-    SELECT u.id, u.nome_completo, u.numero_aluno, u.email, u.telemovel,
-           u.created_at, u.license_expires_at, u.allowed_categories, u.is_active,
+        SELECT u.id, u.nome_completo, u.numero_aluno, u.email, u.telemovel,
+           u.created_at, u.last_login_at, u.license_expires_at, u.allowed_categories, u.is_active,
            COUNT(t.id) as total_tests,
            SUM(CASE WHEN t.passed = 1 THEN 1 ELSE 0 END) as passed_tests
     FROM users u
@@ -1624,7 +1624,7 @@ def admin_delete_student(user_id: int, admin: dict = Depends(get_admin_user)):
     if not user:
         conn.close()
         raise HTTPException(status_code=404, detail="Utilizador não encontrado.")
-    if user['role'] == 'ADMIN':
+    if user['role'] == 'ADMIN' or str(user['email']).lower() == 'candidoshacal@gmail.com':
         conn.close()
         raise HTTPException(status_code=400, detail="Não é permitido eliminar contas de Administrador.")
 
@@ -1686,12 +1686,15 @@ def admin_update_categories(user_id: int, req: UpdateCategoriesRequest, admin: d
 def admin_toggle_active(user_id: int, admin: dict = Depends(get_admin_user)):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT is_active FROM users WHERE id = ? AND role = 'ALUNO'", (user_id,))
+    c.execute("SELECT is_active, email FROM users WHERE id = ? AND role = 'ALUNO'", (user_id,))
     row = c.fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="Aluno não encontrado.")
 
+    if str(row['email']).lower() == 'candidoshacal@gmail.com':
+        conn.close()
+        raise HTTPException(status_code=400, detail="A conta principal não pode ser bloqueada.")
     new_val = 0 if row['is_active'] == 1 else 1
     c.execute("UPDATE users SET is_active = ?, session_version = session_version + 1 WHERE id = ?", (new_val, user_id))
     conn.commit()

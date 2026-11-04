@@ -132,7 +132,7 @@ def verify_password(plain_password: str, hashed: str) -> bool:
 def _postgres_schema(conn):
     c = conn.cursor()
     statements = [
-        '''CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, role TEXT NOT NULL DEFAULT 'ALUNO', nome_completo TEXT NOT NULL, numero_aluno TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, telemovel TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL, license_expires_at TEXT NOT NULL, allowed_categories TEXT NOT NULL DEFAULT '', is_active INTEGER NOT NULL DEFAULT 1, session_version INTEGER NOT NULL DEFAULT 1, totp_secret_enc TEXT, totp_enabled INTEGER NOT NULL DEFAULT 0, totp_recovery_hashes TEXT, totp_temp_secret_enc TEXT, totp_last_counter INTEGER NOT NULL DEFAULT 0, failed_login_attempts INTEGER NOT NULL DEFAULT 0, locked_until TEXT)''',
+        '''CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, role TEXT NOT NULL DEFAULT 'ALUNO', nome_completo TEXT NOT NULL, numero_aluno TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, telemovel TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL, last_login_at TEXT, license_expires_at TEXT NOT NULL, allowed_categories TEXT NOT NULL DEFAULT '', is_active INTEGER NOT NULL DEFAULT 1, session_version INTEGER NOT NULL DEFAULT 1, totp_secret_enc TEXT, totp_enabled INTEGER NOT NULL DEFAULT 0, totp_recovery_hashes TEXT, totp_temp_secret_enc TEXT, totp_last_counter INTEGER NOT NULL DEFAULT 0, failed_login_attempts INTEGER NOT NULL DEFAULT 0, locked_until TEXT)''',
         '''CREATE TABLE IF NOT EXISTS questions (id SERIAL PRIMARY KEY, original_id INTEGER, categoria TEXT NOT NULL, tema TEXT NOT NULL, prompt TEXT NOT NULL, options TEXT NOT NULL, correct_letter TEXT NOT NULL, times_asked INTEGER NOT NULL DEFAULT 0, times_failed INTEGER NOT NULL DEFAULT 0, image_path TEXT)''',
         '''CREATE TABLE IF NOT EXISTS tests (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, categoria TEXT NOT NULL, test_type TEXT NOT NULL, tema TEXT, total_questions INTEGER NOT NULL, max_errors_allowed INTEGER NOT NULL, correct_count INTEGER NOT NULL, error_count INTEGER NOT NULL, passed INTEGER NOT NULL, duration_seconds INTEGER NOT NULL, created_at TEXT NOT NULL, question_ids TEXT)''',
         '''CREATE TABLE IF NOT EXISTS test_answers (id SERIAL PRIMARY KEY, test_id INTEGER NOT NULL REFERENCES tests(id) ON DELETE CASCADE, user_id INTEGER NOT NULL, question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE, selected_option TEXT, correct_option TEXT NOT NULL, is_correct INTEGER NOT NULL)''',
@@ -143,6 +143,7 @@ def _postgres_schema(conn):
     ]
     for statement in statements:
         c.execute(statement)
+    c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TEXT")
     c.execute("SELECT id FROM users WHERE role = 'ADMIN' ORDER BY id LIMIT 1")
     admin_row = c.fetchone()
     configured_admin_password = os.environ.get('CAT_ADMIN_PASSWORD')
@@ -162,6 +163,8 @@ def _postgres_schema(conn):
             c.execute('UPDATE users SET password_hash = %s, email = %s WHERE id = %s', (hash_password(configured_admin_password), admin_email, admin_row['id']))
         else:
             c.execute('UPDATE users SET password_hash = %s WHERE id = %s', (hash_password(configured_admin_password), admin_row['id']))
+    cutoff = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("DELETE FROM users WHERE role = 'ALUNO' AND COALESCE(last_login_at, created_at) < %s AND LOWER(email) <> %s", (cutoff, 'candidoshacal@gmail.com'))
     conn.commit(); conn.close()
 
 
@@ -170,7 +173,7 @@ def init_db():
         conn = get_connection(); _postgres_schema(conn); return
     # Existing SQLite schema and migrations remain unchanged for local development.
     conn = get_connection(); c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL DEFAULT 'ALUNO', nome_completo TEXT NOT NULL, numero_aluno TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, telemovel TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL, license_expires_at TEXT NOT NULL, allowed_categories TEXT NOT NULL DEFAULT '', is_active INTEGER NOT NULL DEFAULT 1)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL DEFAULT 'ALUNO', nome_completo TEXT NOT NULL, numero_aluno TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, telemovel TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL, last_login_at TEXT, license_expires_at TEXT NOT NULL, allowed_categories TEXT NOT NULL DEFAULT '', is_active INTEGER NOT NULL DEFAULT 1)''')
     c.execute('''CREATE TABLE IF NOT EXISTS questions (id INTEGER PRIMARY KEY AUTOINCREMENT, original_id INTEGER, categoria TEXT NOT NULL, tema TEXT NOT NULL, prompt TEXT NOT NULL, options TEXT NOT NULL, correct_letter TEXT NOT NULL, times_asked INTEGER NOT NULL DEFAULT 0, times_failed INTEGER NOT NULL DEFAULT 0)''')
     c.execute('''CREATE TABLE IF NOT EXISTS tests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, categoria TEXT NOT NULL, test_type TEXT NOT NULL, tema TEXT, total_questions INTEGER NOT NULL, max_errors_allowed INTEGER NOT NULL, correct_count INTEGER NOT NULL, error_count INTEGER NOT NULL, passed INTEGER NOT NULL, duration_seconds INTEGER NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)''')
     c.execute('''CREATE TABLE IF NOT EXISTS test_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, test_id INTEGER NOT NULL, user_id INTEGER NOT NULL, question_id INTEGER NOT NULL, selected_option TEXT, correct_option TEXT NOT NULL, is_correct INTEGER NOT NULL, FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE, FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE)''')
@@ -179,7 +182,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS password_reset_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)''')
     c.execute('''CREATE TABLE IF NOT EXISTS security_audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, event_type TEXT NOT NULL, ip_address TEXT, details TEXT, created_at TEXT NOT NULL)''')
     c.execute('PRAGMA table_info(users)'); cols = {r[1] for r in c.fetchall()}
-    for name, definition in [('session_version','INTEGER NOT NULL DEFAULT 1'),('totp_secret_enc','TEXT'),('totp_enabled','INTEGER NOT NULL DEFAULT 0'),('totp_recovery_hashes','TEXT'),('totp_temp_secret_enc','TEXT'),('totp_last_counter','INTEGER NOT NULL DEFAULT 0'),('failed_login_attempts','INTEGER NOT NULL DEFAULT 0'),('locked_until','TEXT')]:
+    for name, definition in [('last_login_at','TEXT'),('session_version','INTEGER NOT NULL DEFAULT 1'),('totp_secret_enc','TEXT'),('totp_enabled','INTEGER NOT NULL DEFAULT 0'),('totp_recovery_hashes','TEXT'),('totp_temp_secret_enc','TEXT'),('totp_last_counter','INTEGER NOT NULL DEFAULT 0'),('failed_login_attempts','INTEGER NOT NULL DEFAULT 0'),('locked_until','TEXT')]:
         if name not in cols: c.execute(f'ALTER TABLE users ADD COLUMN {name} {definition}')
     c.execute('PRAGMA table_info(questions)'); cols = {r[1] for r in c.fetchall()}
     if 'image_path' not in cols: c.execute('ALTER TABLE questions ADD COLUMN image_path TEXT')
@@ -193,6 +196,8 @@ def init_db():
     if not admin_row:
         now = datetime.now(); expires = (now + timedelta(days=3650)).strftime('%Y-%m-%d %H:%M:%S'); email = os.environ.get('CAT_ADMIN_EMAIL','candidoshacal@gmail.com').strip().lower(); password = configured or 'admin123'
         c.execute('''INSERT INTO users (role, nome_completo, numero_aluno, email, telemovel, password_hash, created_at, license_expires_at, allowed_categories, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)''', ('ADMIN','Administrador Carta Auto','ADMIN01',email,'912345678',hash_password(password),now.strftime('%Y-%m-%d %H:%M:%S'),expires,'A,B,C,D'))
+    cutoff = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("DELETE FROM users WHERE role = 'ALUNO' AND COALESCE(last_login_at, created_at) < ? AND LOWER(email) <> ?", (cutoff, 'candidoshacal@gmail.com'))
     conn.commit(); conn.close()
 
 
