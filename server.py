@@ -1404,8 +1404,9 @@ def get_student_summary(user: dict = Depends(get_current_user)):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("SELECT COUNT(*), SUM(passed), SUM(correct_count), SUM(error_count), SUM(total_questions) FROM tests WHERE user_id = ?", (user['id'],))
-    total_tests, total_passed, total_correct, total_errors, total_q = c.fetchone()
+    c.execute("SELECT COUNT(*) AS total_tests, SUM(passed) AS total_passed, SUM(correct_count) AS total_correct, SUM(error_count) AS total_errors, SUM(total_questions) AS total_q FROM tests WHERE user_id = ?", (user['id'],))
+    totals = c.fetchone()
+    total_tests, total_passed, total_correct, total_errors, total_q = (totals[i] for i in range(5))
     total_tests = total_tests or 0
     total_passed = total_passed or 0
     total_correct = total_correct or 0
