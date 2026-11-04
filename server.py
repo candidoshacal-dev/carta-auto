@@ -426,7 +426,7 @@ def login(req: LoginRequest, request: Request):
 
     # Admin MFA flow
     if user['role'] == 'ADMIN':
-        if not user.get('totp_enabled'):
+        if not user['totp_enabled']:
             temp_token = create_mfa_temp_token(user['id'], 'mfa-setup')
             log_security_event(user['id'], 'admin_login_mfa_setup_pending', 'Credenciais corretas; aguarda configuração de TOTP.', client_ip)
             return {
@@ -448,7 +448,7 @@ def login(req: LoginRequest, request: Request):
     # Student login
     record_successful_login(user['id'], client_ip)
     log_security_event(user['id'], 'login_success', 'Início de sessão efetuado com sucesso.', client_ip)
-    token = create_session(user['id'], user.get('session_version', 1))
+    token = create_session(user['id'], user['session_version'] if 'session_version' in user.keys() else 1)
     lic = get_license_info(user['license_expires_at'])
 
     return {
@@ -525,7 +525,7 @@ def mfa_confirm(req: MFAConfirmRequest, request: Request):
         raise HTTPException(status_code=403, detail="Acesso reservado ao Administrador.")
 
     user = dict(user)
-    if not user.get('totp_temp_secret_enc'):
+    if not user['totp_temp_secret_enc']:
         conn.close()
         raise HTTPException(status_code=400, detail="Configuração de MFA não iniciada.")
 
@@ -571,7 +571,7 @@ def mfa_confirm(req: MFAConfirmRequest, request: Request):
     record_successful_login(user_id, client_ip)
     log_security_event(user_id, 'mfa_enabled', 'MFA TOTP ativado com sucesso.', client_ip)
 
-    token = create_session(user_id, user.get('session_version', 1))
+    token = create_session(user_id, user['session_version'] if 'session_version' in user.keys() else 1)
     lic = get_license_info(user['license_expires_at'])
     return {
         "message": "Autenticação de dois fatores ativada com sucesso.",
@@ -606,7 +606,7 @@ def mfa_verify(req: MFAVerifyRequest, request: Request):
     client_ip = get_client_ip(request)
     check_account_locked(user)
 
-    if not user.get('totp_enabled') or not user.get('totp_secret_enc'):
+    if not user['totp_enabled'] or not user['totp_secret_enc']:
         conn.close()
         raise HTTPException(status_code=400, detail="MFA não se encontra ativado para esta conta.")
 
@@ -650,7 +650,7 @@ def mfa_verify(req: MFAVerifyRequest, request: Request):
 
         record_successful_login(user_id, client_ip)
         log_security_event(user_id, 'mfa_login_success', 'Login autenticado via TOTP.', client_ip)
-        token = create_session(user_id, user.get('session_version', 1))
+        token = create_session(user_id, user['session_version'] if 'session_version' in user.keys() else 1)
         lic = get_license_info(user['license_expires_at'])
         return {
             "token": token,
@@ -669,7 +669,7 @@ def mfa_verify(req: MFAVerifyRequest, request: Request):
     # Recovery code check
     norm_code = clean_code.replace('-', '').upper()
     code_hash = hashlib.sha256(norm_code.encode('utf-8')).hexdigest()
-    hashes = json.loads(user.get('totp_recovery_hashes') or '[]')
+    hashes = json.loads(user['totp_recovery_hashes'] or '[]')
 
     matched_recovery_indexes = [i for i, saved_hash in enumerate(hashes) if hmac.compare_digest(code_hash, saved_hash)]
     if matched_recovery_indexes:
@@ -684,7 +684,7 @@ def mfa_verify(req: MFAVerifyRequest, request: Request):
 
         record_successful_login(user_id, client_ip)
         log_security_event(user_id, 'mfa_recovery_used', f'Código de recuperação utilizado. Restam {len(hashes)} códigos.', client_ip)
-        token = create_session(user_id, user.get('session_version', 1))
+        token = create_session(user_id, user['session_version'] if 'session_version' in user.keys() else 1)
         lic = get_license_info(user['license_expires_at'])
         return {
             "token": token,
@@ -777,7 +777,7 @@ def update_password(req: UpdatePasswordRequest, user: dict = Depends(get_current
 
     conn = get_connection()
     c = conn.cursor()
-    new_version = (user.get('session_version') or 1) + 1
+    new_version = (user['session_version'] or 1) + 1
     c.execute("UPDATE users SET password_hash = ?, session_version = ? WHERE id = ?", (hash_password(req.new_password), new_version, user['id']))
     conn.commit()
     conn.close()
