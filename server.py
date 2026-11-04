@@ -1801,6 +1801,8 @@ def admin_update_question(question_id: int, req: AdminQuestionRequest, admin: di
     if cat not in {'A','B','C','D'} or not req.prompt.strip() or not req.tema.strip() or len(req.options) < 2 or letter not in letters:
         raise HTTPException(status_code=400, detail="Verifique categoria, tema, pergunta e opções.")
     options = [{"letter": str(o.get('letter','')).upper(), "text": str(o.get('text','')).strip(), "is_correct": str(o.get('letter','')).upper() == letter} for o in req.options]
+    if any(not o['text'] for o in options) or len(set(letters)) != len(letters):
+        raise HTTPException(status_code=400, detail="As opções têm de ser únicas e não vazias.")
 
     conn = get_connection()
     c = conn.cursor()
