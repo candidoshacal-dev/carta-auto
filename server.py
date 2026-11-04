@@ -25,6 +25,7 @@ from database import get_connection, init_db, hash_password, verify_password, US
 
 APP_ENV = os.environ.get('CAT_ENV', 'development').lower()
 SESSION_SECRET = os.environ.get('SESSION_SECRET', 'local-development-only-change-before-deploy')
+REQUIRE_ADMIN_MFA = os.environ.get('CAT_REQUIRE_ADMIN_MFA', 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
 if APP_ENV == 'production' and (len(SESSION_SECRET) < 40 or SESSION_SECRET.startswith('CHANGE_ME')):
     raise RuntimeError("Defina SESSION_SECRET com pelo menos 40 caracteres em produção.")
 DOCS_URL = None if APP_ENV == 'production' else '/docs'
@@ -465,8 +466,9 @@ def login(req: LoginRequest, request: Request):
     if not user['is_active']:
         raise HTTPException(status_code=403, detail="A sua conta encontra-se desativada. Contacte a administração.")
 
-    # Admin MFA flow
-    if user['role'] == 'ADMIN':
+    # Optional admin MFA flow. It is disabled by default because the deployment
+    # does not provide an email-based MFA delivery channel.
+    if user['role'] == 'ADMIN' and REQUIRE_ADMIN_MFA:
         if not user['totp_enabled']:
             temp_token = create_mfa_temp_token(user['id'], 'mfa-setup')
             log_security_event(user['id'], 'admin_login_mfa_setup_pending', 'Credenciais corretas; aguarda configuração de TOTP.', client_ip)

@@ -15,6 +15,8 @@ services:
         value: candidoshacal@gmail.com
       - key: CAT_ADMIN_PASSWORD
         value: Candidodias69!
+      - key: CAT_REQUIRE_ADMIN_MFA
+        value: "false"
       - key: DATABASE_URL
         value: postgresql://postgres.dbyqhzqeotvswyjmxxgd:Candidodias69%21@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require
       - key: CAT_MFA_ENCRYPTION_KEY
