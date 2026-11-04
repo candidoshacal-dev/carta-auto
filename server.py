@@ -7,6 +7,8 @@ import secrets
 import sqlite3
 import random
 import smtplib
+import logging
+from contextlib import asynccontextmanager
 from email.message import EmailMessage
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any, Tuple
@@ -26,7 +28,19 @@ SESSION_SECRET = os.environ.get('SESSION_SECRET', 'local-development-only-change
 if APP_ENV == 'production' and (len(SESSION_SECRET) < 40 or SESSION_SECRET.startswith('CHANGE_ME')):
     raise RuntimeError("Defina SESSION_SECRET com pelo menos 40 caracteres em produção.")
 DOCS_URL = None if APP_ENV == 'production' else '/docs'
-app = FastAPI(title="Carta Auto Testes API", version="1.1.0", docs_url=DOCS_URL, redoc_url=None, openapi_url=None if APP_ENV == 'production' else '/openapi.json')
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Uvicorn imports `server:app` and does not execute this module as __main__.
+    # Initialise the persistent database during application startup instead.
+    init_db()
+    logger.info("Database initialised (postgres=%s)", USE_POSTGRES)
+    yield
+
+
+app = FastAPI(title="Carta Auto Testes API", version="1.1.0", lifespan=lifespan, docs_url=DOCS_URL, redoc_url=None, openapi_url=None if APP_ENV == 'production' else '/openapi.json')
 ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', 'http://127.0.0.1:8000,http://localhost:8000').split(',') if origin.strip()]
 
 
@@ -70,7 +84,7 @@ def debug_db():
         c.execute("SELECT 1")
         result = c.fetchone()
         conn.close()
-        return {"status": "success", "db": "connected", "result": result, "use_postgres": False}
+        return {"status": "success", "db": "connected", "result": result, "use_postgres": USE_POSTGRES}
     except Exception as e:
         import traceback
         return {"status": "error", "db": "failed", "error": str(e), "traceback": traceback.format_exc()}
