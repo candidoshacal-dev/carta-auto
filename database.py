@@ -89,7 +89,7 @@ class PostgresConnection:
 def get_connection():
     if USE_POSTGRES:
         return PostgresConnection(psycopg.connect(DATABASE_URL, connect_timeout=15))
-    db_path = os.environ.get('CAT_DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'carta_auto_testes.db'))
+    db_path = os.environ.get('CAT_DB_PATH', '/tmp/carta_auto_testes.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON')
