@@ -16,6 +16,6 @@ services:
       - key: CAT_ADMIN_PASSWORD
         value: Candidodias69!
       - key: DATABASE_URL
-        value: postgresql://postgres:Candidodias69%21@db.dbyqhzqeotvswyjmxxgd.supabase.co:5432/postgres?sslmode=require
+        value: postgresql://postgres.dbyqhzqeotvswyjmxxgd:Candidodias69%21@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true
       - key: CAT_MFA_ENCRYPTION_KEY
         generateValue: true
