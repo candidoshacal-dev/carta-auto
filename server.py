@@ -44,10 +44,27 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Carta Auto Testes API", version="1.1.0", lifespan=lifespan, docs_url=DOCS_URL, redoc_url=None, openapi_url=None if APP_ENV == 'production' else '/openapi.json')
 ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', 'http://127.0.0.1:8000,http://localhost:8000').split(',') if origin.strip()]
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+    if APP_ENV == 'production':
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
+def reject_public_debug():
+    if APP_ENV == 'production':
+        raise HTTPException(status_code=404, detail="Não encontrado.")
+
 
 
 @app.get("/debug/login/{email}")
 def debug_login(email: str):
+    reject_public_debug()
     try:
         conn = get_connection()
         c = conn.cursor()
@@ -75,10 +92,12 @@ def debug_login(email: str):
 
 @app.get("/debug/simple")
 def debug_simple():
+    reject_public_debug()
     return {"status": "ok", "message": "Debug endpoint working"}
 
 @app.get("/debug/db")
 def debug_db():
+    reject_public_debug()
     try:
         conn = get_connection()
         c = conn.cursor()
