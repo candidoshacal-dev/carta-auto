@@ -31,6 +31,33 @@ ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', '
 
 
 
+@app.get("/debug/login/{email}")
+def debug_login(email: str):
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (email.strip(),))
+        user = c.fetchone()
+        if not user:
+            return {"status": "error", "message": "User not found"}
+        
+        user_dict = dict(user)
+        return {
+            "status": "success", 
+            "user_found": True,
+            "user_id": user_dict['id'],
+            "role": user_dict['role'],
+            "email": user_dict['email'],
+            "is_active": user_dict['is_active'],
+            "password_hash": user_dict['password_hash'][:50] + "...",
+            "totp_enabled": user_dict.get('totp_enabled', 0)
+        }
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
+
+
 @app.get("/debug/simple")
 def debug_simple():
     return {"status": "ok", "message": "Debug endpoint working"}
