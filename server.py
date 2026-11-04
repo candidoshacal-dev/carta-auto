@@ -29,6 +29,25 @@ DOCS_URL = None if APP_ENV == 'production' else '/docs'
 app = FastAPI(title="Carta Auto Testes API", version="1.1.0", docs_url=DOCS_URL, redoc_url=None, openapi_url=None if APP_ENV == 'production' else '/openapi.json')
 ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', 'http://127.0.0.1:8000,http://localhost:8000').split(',') if origin.strip()]
 
+
+
+@app.get("/debug/simple")
+def debug_simple():
+    return {"status": "ok", "message": "Debug endpoint working"}
+
+@app.get("/debug/db")
+def debug_db():
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT 1")
+        result = c.fetchone()
+        conn.close()
+        return {"status": "success", "db": "connected", "result": result, "use_postgres": False}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "db": "failed", "error": str(e), "traceback": traceback.format_exc()}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
