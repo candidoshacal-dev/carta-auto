@@ -4,14 +4,21 @@ import os
 import re
 import secrets
 import sqlite3
+import traceback
 from datetime import datetime, timedelta
+import sys
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 USE_POSTGRES = bool(DATABASE_URL)
 
 if USE_POSTGRES:
-    import psycopg
-    from psycopg.rows import tuple_row
+    try:
+        import psycopg
+        from psycopg.rows import tuple_row
+    except Exception as e:
+        print(f"ERROR importing psycopg: {e}", file=sys.stderr)
+        traceback.print_exc()
+        raise
 
 
 class HybridRow(dict):
@@ -88,7 +95,12 @@ class PostgresConnection:
 
 def get_connection():
     if USE_POSTGRES:
-        return PostgresConnection(psycopg.connect(DATABASE_URL, connect_timeout=15))
+        try:
+            return PostgresConnection(psycopg.connect(DATABASE_URL, connect_timeout=15))
+        except Exception as e:
+            print(f"ERROR connecting to PostgreSQL: {e}", file=sys.stderr)
+            traceback.print_exc()
+            raise
     db_path = os.environ.get('CAT_DB_PATH', '/tmp/carta_auto_testes.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
