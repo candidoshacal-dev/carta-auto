@@ -101,7 +101,7 @@ def get_connection():
             print(f"ERROR connecting to PostgreSQL: {e}", file=sys.stderr)
             traceback.print_exc()
             raise
-    db_path = os.environ.get('CAT_DB_PATH', '/tmp/carta_auto_testes.db')
+    db_path = os.environ.get('CAT_DB_PATH', os.path.join(os.getcwd(), 'carta_auto_testes.db'))
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON')
