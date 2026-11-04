@@ -319,6 +319,7 @@ class RegisterRequest(BaseModel):
     telemovel: str
     password: str
     confirmar_password: str
+    communications_consent: bool = False
 
 class LoginRequest(BaseModel):
     login: str  # email OR numero_aluno
@@ -341,6 +342,9 @@ class MFARegenerateRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     email: str
     telemovel: str
+
+class CommunicationsConsentRequest(BaseModel):
+    consent: bool
 
 class UpdatePasswordRequest(BaseModel):
     current_password: str
@@ -415,8 +419,8 @@ def register(req: RegisterRequest):
     expires_at = (now + timedelta(days=60)).strftime('%Y-%m-%d %H:%M:%S')
 
     c.execute("""
-    INSERT INTO users (role, nome_completo, numero_aluno, email, telemovel, password_hash, created_at, license_expires_at, allowed_categories, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    INSERT INTO users (role, nome_completo, numero_aluno, email, telemovel, password_hash, created_at, marketing_consent, marketing_consent_at, license_expires_at, allowed_categories, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     RETURNING id
     """, (
         'ALUNO',
@@ -426,6 +430,8 @@ def register(req: RegisterRequest):
         req.telemovel.strip(),
         hash_password(req.password),
         now.strftime('%Y-%m-%d %H:%M:%S'),
+        1 if req.communications_consent else 0,
+        now.strftime('%Y-%m-%d %H:%M:%S') if req.communications_consent else None,
         expires_at,
         '' # No test access until the administrator grants a category
     ))
@@ -808,6 +814,7 @@ def get_me(user: dict = Depends(get_current_user)):
         "numero_aluno": user['numero_aluno'],
         "email": user['email'],
         "telemovel": user['telemovel'],
+        "communications_consent": bool(user.get('marketing_consent', 0)),
         "allowed_categories": [cat.strip() for cat in user['allowed_categories'].split(',') if cat.strip()],
         "license": lic
     }
@@ -828,6 +835,16 @@ def update_profile(req: UpdateProfileRequest, user: dict = Depends(get_current_u
     conn.commit()
     conn.close()
     return {"message": "Perfil atualizado com sucesso."}
+
+@app.put("/api/auth/communications")
+def update_communications(req: CommunicationsConsentRequest, user: dict = Depends(get_current_user)):
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET marketing_consent = ?, marketing_consent_at = ? WHERE id = ?", (1 if req.consent else 0, now_str if req.consent else None, user['id']))
+    conn.commit()
+    conn.close()
+    return {"message": "Preferência de comunicações atualizada.", "communications_consent": req.consent}
 
 @app.put("/api/auth/password")
 def update_password(req: UpdatePasswordRequest, user: dict = Depends(get_current_user)):
@@ -1552,7 +1569,7 @@ def admin_get_students(
 
     query = """
         SELECT u.id, u.nome_completo, u.numero_aluno, u.email, u.telemovel,
-           u.created_at, u.last_login_at, u.license_expires_at, u.allowed_categories, u.is_active,
+           u.created_at, u.last_login_at, u.marketing_consent, u.license_expires_at, u.allowed_categories, u.is_active,
            COUNT(t.id) as total_tests,
            SUM(CASE WHEN t.passed = 1 THEN 1 ELSE 0 END) as passed_tests
     FROM users u
