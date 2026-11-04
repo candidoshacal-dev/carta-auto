@@ -408,7 +408,7 @@ def register(req: RegisterRequest):
         hash_password(req.password),
         now.strftime('%Y-%m-%d %H:%M:%S'),
         expires_at,
-        'B' # Default category B
+        '' # No test access until the administrator grants a category
     ))
     user_id = c.fetchone()[0] if USE_POSTGRES else c.lastrowid
     conn.commit()
@@ -1258,8 +1258,8 @@ def submit_test(test_id: int, req: SubmitTestRequest, user: dict = Depends(get_c
         INSERT INTO student_question_stats (user_id, question_id, times_seen, times_failed, last_seen_at, last_correct)
         VALUES (?, ?, 1, ?, ?, ?)
         ON CONFLICT(user_id, question_id) DO UPDATE SET
-            times_seen = times_seen + 1,
-            times_failed = times_failed + excluded.times_failed,
+            times_seen = student_question_stats.times_seen + 1,
+            times_failed = student_question_stats.times_failed + excluded.times_failed,
             last_seen_at = excluded.last_seen_at,
             last_correct = excluded.last_correct
         """, (user['id'], qid, 0 if is_corr else 1, now_str, 1 if is_corr else 0))
@@ -1414,7 +1414,7 @@ def get_student_summary(user: dict = Depends(get_current_user)):
     approval_rate = round((total_passed / total_tests * 100), 1) if total_tests > 0 else 0
     average_score = round((total_correct / total_q * 100), 1) if total_q > 0 else 0
 
-    c.execute("SELECT MAX(ROUND(CAST(correct_count AS FLOAT) / total_questions * 100, 1)) FROM tests WHERE user_id = ?", (user['id'],))
+    c.execute("SELECT MAX(ROUND((CAST(correct_count AS NUMERIC) / NULLIF(total_questions, 0)) * 100, 1)) FROM tests WHERE user_id = ?", (user['id'],))
     best_row = c.fetchone()
     best_score = best_row[0] if best_row and best_row[0] is not None else 0
 
@@ -1429,7 +1429,7 @@ def get_student_summary(user: dict = Depends(get_current_user)):
 
     c.execute("""
     SELECT categoria, COUNT(*) as count, SUM(passed) as passed,
-           ROUND(AVG(CAST(correct_count AS FLOAT) / total_questions * 100), 1) as avg_percent
+           ROUND(AVG((CAST(correct_count AS NUMERIC) / NULLIF(total_questions, 0)) * 100), 1) as avg_percent
     FROM tests WHERE user_id = ? GROUP BY categoria
     """, (user['id'],))
     cat_perf = [dict(r) for r in c.fetchall()]
