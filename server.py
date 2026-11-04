@@ -1483,17 +1483,13 @@ def admin_overview(admin: dict = Depends(get_admin_user)):
     active_licenses = c.fetchone()[0] or 0
     expired_licenses = total_students - active_licenses
 
-    c.execute("""
-        SELECT COUNT(*) FROM users
-        WHERE role = 'ALUNO' AND (
-            license_expires_at < ? OR
-            julianday(license_expires_at) - julianday(?) <= 10
-        )
-    """, (now_str, now_str))
+    renew_deadline = (datetime.now() + timedelta(days=10)).strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("SELECT COUNT(*) FROM users WHERE role = 'ALUNO' AND license_expires_at <= ?", (renew_deadline,))
     pending_renewals = c.fetchone()[0] or 0
 
-    c.execute("SELECT COUNT(*), SUM(passed) FROM tests")
-    total_tests, total_passed = c.fetchone()
+    c.execute("SELECT COUNT(*) AS total_tests, SUM(passed) AS total_passed FROM tests")
+    totals = c.fetchone()
+    total_tests, total_passed = totals[0], totals[1]
     total_tests = total_tests or 0
     total_passed = total_passed or 0
     approval_rate = round((total_passed / total_tests * 100), 1) if total_tests > 0 else 0
@@ -1588,8 +1584,9 @@ def admin_get_student_detail(user_id: int, admin: dict = Depends(get_admin_user)
     student['license'] = lic
     student['allowed_categories'] = [cat.strip() for cat in student['allowed_categories'].split(',') if cat.strip()]
 
-    c.execute("SELECT COUNT(*), SUM(passed), SUM(correct_count), SUM(error_count) FROM tests WHERE user_id = ?", (user_id,))
-    total_tests, total_passed, total_correct, total_errors = c.fetchone()
+    c.execute("SELECT COUNT(*) AS total_tests, SUM(passed) AS total_passed, SUM(correct_count) AS total_correct, SUM(error_count) AS total_errors FROM tests WHERE user_id = ?", (user_id,))
+    totals = c.fetchone()
+    total_tests, total_passed, total_correct, total_errors = (totals[i] for i in range(4))
     total_tests = total_tests or 0
     total_passed = total_passed or 0
     approval_rate = round((total_passed / total_tests * 100), 1) if total_tests > 0 else 0
@@ -1676,9 +1673,6 @@ def admin_renew_license(user_id: int, req: RenewLicenseRequest, admin: dict = De
 def admin_update_categories(user_id: int, req: UpdateCategoriesRequest, admin: dict = Depends(get_admin_user)):
     valid_cats = {'A', 'B', 'C', 'D'}
     chosen = [c.upper() for c in req.categories if c.upper() in valid_cats]
-    if not chosen:
-        chosen = ['B']
-
     cats_str = ','.join(sorted(chosen))
     conn = get_connection()
     c = conn.cursor()
